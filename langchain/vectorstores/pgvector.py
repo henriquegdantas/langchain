@@ -66,6 +66,11 @@ class CollectionStore(BaseModel):
 
 class EmbeddingStore(BaseModel):
     __tablename__ = "langchain_pg_embedding"
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint(
+            "collection_id", "custom_id", name="collection_id_custom_id_unique"
+        ),
+    )
 
     collection_id: Mapped[UUID] = sqlalchemy.Column(
         UUID(as_uuid=True),
