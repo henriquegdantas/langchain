@@ -1,6 +1,7 @@
 import enum
 import logging
 import uuid
+import json
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import sqlalchemy
@@ -221,15 +222,26 @@ class PGVector(VectorStore):
             collection = self.get_collection(session)
             if not collection:
                 raise ValueError("Collection not found")
+
             for text, metadata, embedding, id in zip(texts, metadatas, embeddings, ids):
-                embedding_store = EmbeddingStore(
-                    embedding=embedding,
-                    document=text,
-                    cmetadata=metadata,
-                    custom_id=id,
+                stmt = sqlalchemy.text(
+                    f"""
+                    INSERT INTO {EmbeddingStore.__tablename__} (uuid, collection_id, embedding, document, cmetadata, custom_id)
+                    VALUES (:uuid, :collection_id, :embedding, :document, :cmetadata, :custom_id)
+                    ON CONFLICT (custom_id, collection_id) DO NOTHING;
+                    """
                 )
-                collection.embeddings.append(embedding_store)
-                session.add(embedding_store)
+                session.execute(
+                    stmt,
+                    {
+                        "uuid": str(uuid.uuid4()),
+                        "collection_id": str(collection.uuid),
+                        "embedding": embedding,
+                        "document": text,
+                        "cmetadata": json.dumps(metadata),
+                        "custom_id": id,
+                    },
+                )
             session.commit()
 
         return ids
